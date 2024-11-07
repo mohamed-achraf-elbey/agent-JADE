@@ -1,0 +1,15 @@
+Refrigerator: 150
+Air Conditioner: 2000
+LED Bulb: 10
+Electric Oven: 2200
+Microwave: 800
+Washing Machine: 500
+Television: 120
+Computer: 200
+Water Heater: 1500
+Ceiling Fan: 60
+Vacuum Cleaner: 1400
+Toaster: 800
+Iron: 1100
+Dishwasher: 1800
+Coffee Maker: 900
