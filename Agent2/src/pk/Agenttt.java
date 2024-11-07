@@ -4,10 +4,10 @@ import jade.core.Agent;
 import jade.lang.acl.ACLMessage;
 
 public class Agenttt extends Agent {
-	public int capacite ;
+	public int capacity ;
 	public int onlineSite ;
 	public int offlineSite ;
-	public boolean etat = true;
+	public boolean status = true;
 	public int time = 0 ;
 
 	   @Override
@@ -17,7 +17,7 @@ public class Agenttt extends Agent {
 	    }
 	   
 	   public void listenMsg() {
-		    while (etat) {
+		    while (status) {
 		        ACLMessage msg = receive();
 		        if (msg != null) {
 		            System.out.println("Agent2 received message: " + msg.getContent());
