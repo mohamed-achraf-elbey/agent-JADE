@@ -17,13 +17,19 @@ public static void main(String []args){
     ContainerController cc = rt.createMainContainer(p);
 
     try {
-        AgentController agent1 = cc.createNewAgent("agent1", "pk.Agenttt", null);
-        AgentController agent2 = cc.createNewAgent("agent2", "pk.Agenttt", null);
-        agent1.start();
-        agent2.start();
+        AgentController agentP = cc.createNewAgent("p", "pk.Agenttt", null);
+        AgentController agentL1 = cc.createNewAgent("l", "pk.Agenttt", null);
+        AgentController agentL2 = cc.createNewAgent("l", "pk.Agenttt", null);
+
+        
+        agentP.start();
+        agentL1.start();
+        agentL2.start();
+    
         
     } catch (Exception e) {
         e.printStackTrace();
     }
+    
 }
 }
