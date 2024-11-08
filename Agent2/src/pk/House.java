@@ -84,7 +84,7 @@ public class House {
         House h = new House(); 
         h.loadComponents("PowerComponents.txt");
         Random random = new Random();
-        int randomIndex = 5 + random.nextInt(6); // Between 5 and 10 random components
+        int randomIndex = 5 + random.nextInt(1);
         h.addRandomComponents(randomIndex);
         h.clculConsumePower();
         h.loadComponents("PowerComponents.txt");

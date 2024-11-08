@@ -18,8 +18,8 @@ public static void main(String []args){
 
     try {
         AgentController agentP = cc.createNewAgent("p", "pk.Agenttt", null);
-        AgentController agentL1 = cc.createNewAgent("l", "pk.Agenttt", null);
-        AgentController agentL2 = cc.createNewAgent("l", "pk.Agenttt", null);
+        AgentController agentL1 = cc.createNewAgent("l1", "pk.Agenttt", null);
+        AgentController agentL2 = cc.createNewAgent("l2", "pk.Agenttt", null);
 
         
         agentP.start();
