@@ -6,11 +6,13 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Random;
 
-public class House {
+
+public class HouseAndCompany {
 	public boolean status = true ;
 	public double consumePower = 0 ;
+	public boolean type = false ;
     public HashMap<String, Double> components = new HashMap<>();
-    public HashMap<String, Double> componentsHouse = new HashMap<>();
+    public HashMap<String, Double> componentsHouseAndCompany = new HashMap<>();
     
 
 
@@ -33,8 +35,8 @@ public class House {
     public void displayComponents() {
         System.out.println("displaying componentsHouse :");
         
-        for (String component : componentsHouse.keySet()) {
-            Double power = componentsHouse.get(component);
+        for (String component : componentsHouseAndCompany.keySet()) {
+            Double power = componentsHouseAndCompany.get(component);
             System.out.println(component + ": " + power + " W");
         }
     }
@@ -45,7 +47,7 @@ public class House {
             int randomIndex = random.nextInt(components.size());
             String randomKey = (String) components.keySet().toArray()[randomIndex];
             //System.out.println(randomKey);
-            componentsHouse.put(randomKey, components.get(randomKey));
+            componentsHouseAndCompany.put(randomKey, components.get(randomKey));
             components.remove(randomKey);
         }
     }
@@ -54,7 +56,7 @@ public class House {
     
     public void clculConsumePower(){
     	consumePower = 0 ;
-        consumePower = componentsHouse.values().stream().mapToDouble(Double::doubleValue).sum(); 
+        consumePower = componentsHouseAndCompany.values().stream().mapToDouble(Double::doubleValue).sum(); 
     }
     
 
@@ -80,11 +82,21 @@ public class House {
 		this.consumePower = consumePower;
 	}
 	
-	public static House initializeHouse() {
-        House h = new House(); 
+	public static HouseAndCompany initializeHouseAndCompany() {
+        HouseAndCompany h = new HouseAndCompany(); 
         h.loadComponents("PowerComponents.txt");
-        Random random = new Random();
-        int randomIndex = 5 + random.nextInt(1);
+        Random ch = new Random();
+        int randomIndex = 0 ;
+        if(ch.nextDouble() > 0.4) { // add house
+        	Random random = new Random();
+            randomIndex = 5 + random.nextInt(3);
+
+        }else {// add company
+        	
+        	Random random = new Random();
+            randomIndex = 15 + random.nextInt(3);
+        }
+        
         h.addRandomComponents(randomIndex);
         h.clculConsumePower();
         h.loadComponents("PowerComponents.txt");

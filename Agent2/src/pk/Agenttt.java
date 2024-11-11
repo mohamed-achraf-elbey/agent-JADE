@@ -2,117 +2,109 @@ package pk;
 
 import jade.core.Agent;
 import jade.lang.acl.ACLMessage;
+import jade.core.behaviours.CyclicBehaviour;
+import jade.core.behaviours.OneShotBehaviour;
+import jade.core.behaviours.TickerBehaviour;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import jade.core.behaviours.Behaviour;
-import jade.core.behaviours.CyclicBehaviour;
 
 public class Agenttt extends Agent {
     private Double capacity;
     private boolean status;
-    private Double cosumCap = 0.0 ;
-    
+    private Double totalConsumedPower = 0.0;
+
     private final int onlineStart = 8;
     private final int onlineEnd = 16;
-    private int numSiteOnline = 0 ;
-    private int numSiteOffline = 0 ;
+    private int time = 0;
 
-    private int time ;
-    
-    // Only for local agents
-    private List<House> houses = new ArrayList<>();
+    private List<HouseAndCompany> houseAndCompany = new ArrayList<>();
 
     @Override
     protected void setup() {
-        System.out.println("Agent " + getLocalName() + " is starting.");
+        System.out.println("Agent " + getLocalName() + " is starting ");
         initializeAgent();
-        
+        simulate();
     }
-    
+
     private void initializeAgent() {
-    	if (getLocalName().equals("p")) {
-        	status = true ;
-            capacity = setRandomCapacity(80000, 90000);  // Assign the random capacity to the field
-            System.out.println("Principal agent " + getLocalName() + " capacity: " + String.format("%.2f", capacity)  + " W");
-            sendCapacityToLocalAgents();
-            System.out.println("Principal agent " + getLocalName() + " capacity after send to local agents : " + String.format("%.2f", capacity)  + " W");
-            
-        } else {
-        	status = true ;
-        	initializeHouses();
-        	displayAllHousesComponents();
-            receiveCapacity();
-        }
-    }
-    
-    private void updateStatusP(int time) { // for simulation purposes
-        if (time >= 8 && time <= 16)
-            status = false ; 
-    }
-    
-    private void receiveMsgP() {
-        addBehaviour(new CyclicBehaviour() {
+        addBehaviour(new OneShotBehaviour() {
             public void action() {
-                ACLMessage msg = receive();
-                if (msg != null) {
-                    ACLMessage reply = msg.createReply();
-                    if (status && Math.random() > 0.5) {
-                        reply.setContent("Accepted");
-                    } else {
-                        reply.setContent("Rejected");
-                    }
-                    send(reply);
+                if (getLocalName().equals("p")) {
+                    status = true;
+                    capacity = setRandomCapacity(80000, 90000);
+                    System.out.println("Principal agent " + getLocalName() + " initial capacity: " + String.format("%.2f", capacity) + " W");
+                    sendCapacityToLocalAgents();
                 } else {
-                    block();
+                    status = true;
+                    initializeHouses();
+                    displayAllHousesComponents();
+                    receiveCapacityUpdates();
                 }
             }
         });
     }
 
-    // Method to send capacity to local agents
-    private void sendCapacityToLocalAgents() {
-        if (getLocalName().equals("p")) {
-            ACLMessage msgL1 = new ACLMessage(ACLMessage.REQUEST);
-            ACLMessage msgL2 = new ACLMessage(ACLMessage.REQUEST);
-
-            double capacityL1 = setRandomCapacity(20000, 30000);
-            if (capacity >= capacityL1) {
-                msgL1.setContent("" + capacityL1);
-                capacity -= capacityL1;
-            } else {
-                msgL1.setContent("reject");
-            }
-            msgL1.addReceiver(getAID("l1"));
-            
-            double capacityL2 = setRandomCapacity(20000, 30000);
-            if (capacity >= capacityL2) {
-                msgL2.setContent("" + capacityL2);
-                capacity -= capacityL2;
-            } else {
-                msgL2.setContent("reject");
-            }
-            msgL2.addReceiver(getAID("l2"));
-            
-            send(msgL1);
-            send(msgL2);  
-            System.out.println(getLocalName() + " sent capacity requests to local agents.");
+    private void updateStatus() {
+        if (time >= onlineStart && time <= onlineEnd) {
+            status = capacity > 0;  // Agents are online only if they have capacity
+        } else {
+            status = false;  // Agents are offline outside the online time range
         }
     }
 
-    // Method for local agents to receive capacity messages
-    private void receiveCapacity() {
-    	if (!getLocalName().equals("p"))
+    private void sendCapacityToLocalAgents() {
+        if (getLocalName().equals("p")) {
+            double capacityL1 = setRandomCapacity(20000, 30000);
+            double capacityL2 = setRandomCapacity(20000, 30000);
+
+            if (capacity < capacityL1 + capacityL2) {
+                status = false; // Principal agent goes offline if not enough capacity
+                System.out.println("Principal agent " + getLocalName() + " is offline due to insufficient capacity.");
+            } else {
+                sendCapacityRequest("l1", capacityL1);
+                sendCapacityRequest("l2", capacityL2);
+                System.out.println("P agent sent capacity requests to local agents.");
+            }
+        }
+    }
+
+    private void sendCapacityRequest(String localAgentName, double requestedCapacity) {
+        ACLMessage msg = new ACLMessage(ACLMessage.REQUEST);
+        msg.addReceiver(getAID(localAgentName));
+        if (capacity >= requestedCapacity) {
+            capacity -= requestedCapacity;
+            msg.setContent("" + requestedCapacity);
+        } else {
+            msg.setContent("reject");
+        }
+        send(msg);
+    }
+
+    private void requestAdditionalCapacity() {
+        if (!getLocalName().equals("p")) {
+            ACLMessage msg = new ACLMessage(ACLMessage.REQUEST);
+            double addCapacity = setRandomCapacity(5000, 10000);
+            msg.addReceiver(getAID("p"));
+            msg.setContent(String.valueOf(addCapacity));
+            send(msg);
+            System.out.println(getLocalName() + " requested capacity from Principal.");
+        }
+    }
+
+    private void receiveCapacityUpdates() {
         addBehaviour(new CyclicBehaviour() {
             public void action() {
                 ACLMessage msg = receive();
                 if (msg != null) {
                     String content = msg.getContent();
-                    if (content.equals("reject")) {
+                    if ("reject".equals(content)) {
+                        status = false;
                         System.out.println(getLocalName() + " received: Insufficient capacity from principal.");
                     } else {
                         capacity = Double.parseDouble(content);
-                        System.out.println(getLocalName() + " received capacity: " + String.format("%.2f", capacity)  + " W.");
+                        status = true;
+                        System.out.println(getLocalName() + " received updated capacity: " + String.format("%.2f", capacity) + " W.");
                     }
                 } else {
                     block();
@@ -120,47 +112,86 @@ public class Agenttt extends Agent {
             }
         });
     }
-    
-    // Helper method to generate a random capacity
-    private double setRandomCapacity(int minCapacity, int maxCapacity) {
+
+    private double setRandomCapacity(int minCap, int maxCap) {
         Random random = new Random();
-        return minCapacity + (maxCapacity - minCapacity) * random.nextDouble();
+        return minCap + (maxCap - minCap) * random.nextDouble();
     }
-    
-    
-    
+
     public void initializeHouses() {
-        Random random = new Random();
-        int numHouses = 4 + random.nextInt(3); 
-
+        int numHouses = 4 + new Random().nextInt(3);
         for (int i = 0; i < numHouses; i++) {
-            House newHouse = House.initializeHouse();
-            houses.add(newHouse);
+        	houseAndCompany.add(HouseAndCompany.initializeHouseAndCompany());
         }
-
-        System.out.println("Agent " + getLocalName() + " initialized " + numHouses + " houses.");
+        System.out.println("Agent " + getLocalName() + " initialized " + numHouses + " houses");
     }
-    
+
     public void displayAllHousesComponents() {
-        if (houses.isEmpty()) {
+        if (houseAndCompany.isEmpty()) {
             System.out.println("No houses to display for Agent " + getLocalName());
             return;
         }
 
-        System.out.println("Displaying components for each house managed by Agent " + getLocalName() + ":");
-
-        int houseNumber = 1;
-        for (House house : houses) {
-            System.out.println("House " + houseNumber + " components:");
-            //house.displayComponents();  
-            System.out.println("Total consumption for House " + houseNumber + ": " + String.format("%.2f", house.getConsumePower()) + " W in 1H for agent "+ getLocalName());
-            cosumCap += house.getConsumePower();
-            
-            System.out.println("----------------------------------");
-            houseNumber++;
+        System.out.println("Displaying components for " + getLocalName() + ":");
+        for (HouseAndCompany house : houseAndCompany) {
+            totalConsumedPower += house.getConsumePower();
         }
-        System.err.println("Total consumption for  " + getLocalName() + " : " + String.format("%.2f", cosumCap) + " W in 1H ");
+        System.err.println("Total consumption for " + getLocalName() + ": " + String.format("%.2f", totalConsumedPower) + " W in 1H");
     }
 
+    private void simulate() {
+        addBehaviour(new TickerBehaviour(this, 1000) { // Simulate each hour
+            protected void onTick() {
+                System.out.println("\n--- Simulation time: " + time + "h ---");
 
+                updateStatus();  // Update the agent's online status based on time and capacity
+
+                if (getLocalName().equals("p")) {
+                    receiveCapacityRequests();
+                    System.out.println("Principal agent status: " + (status ? "online" : "offline"));
+                } else {
+                    double powerNeeded = calculateTotalPowerConsumption();
+                    if (capacity < powerNeeded) {
+                        requestAdditionalCapacity();
+                    } else {
+                        capacity -= powerNeeded;
+                    }
+                    System.out.println(getLocalName() + " status: " + (status ? "online" : "offline"));
+                }
+
+                time++;
+                if (time >= 24) {
+                    System.out.println("\nSimulation completed after 24 hours.");
+                    doDelete();
+                }
+            }
+        });
+    }
+
+    private void receiveCapacityRequests() {
+        addBehaviour(new CyclicBehaviour() {
+            public void action() {
+                ACLMessage msg = receive();
+                if (msg != null) {
+                    String content = msg.getContent();
+                    if ("reject".equals(content)) {
+                        System.out.println(getLocalName() + " received: Insufficient capacity from principal.");
+                    } else {
+                        capacity += Double.parseDouble(content);
+                        System.out.println(getLocalName() + " received additional capacity: " + String.format("%.2f", capacity) + " W.");
+                    }
+                } else {
+                    block();
+                }
+            }
+        });
+    }
+
+    public double calculateTotalPowerConsumption() {
+        double totalPower = 0.0;
+        for (HouseAndCompany house : houseAndCompany) {
+            totalPower += house.getConsumePower();
+        }
+        return totalPower;
+    }
 }
