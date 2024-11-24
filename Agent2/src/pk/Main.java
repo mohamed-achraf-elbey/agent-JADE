@@ -22,9 +22,9 @@ public static void main(String []args){
         AgentController agentL2 = cc.createNewAgent("l2", "pk.Agenttt", null);
 
         
-        agentP.start();
-        agentL1.start();
-        agentL2.start();
+       // agentP.start();
+        //agentL1.start();
+        //agentL2.start();
     
         
     } catch (Exception e) {

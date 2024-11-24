@@ -54,7 +54,7 @@ public class HouseAndCompany {
     
     
     
-    public void clculConsumePower(){
+    public void  clculConsumePower(){
     	consumePower = 0 ;
         consumePower = componentsHouseAndCompany.values().stream().mapToDouble(Double::doubleValue).sum(); 
     }
@@ -83,25 +83,24 @@ public class HouseAndCompany {
 	}
 	
 	public static HouseAndCompany initializeHouseAndCompany() {
-        HouseAndCompany h = new HouseAndCompany(); 
-        h.loadComponents("PowerComponents.txt");
-        Random ch = new Random();
-        int randomIndex = 0 ;
-        if(ch.nextDouble() > 0.4) { // add house
-        	Random random = new Random();
-            randomIndex = 5 + random.nextInt(3);
+	    HouseAndCompany h = new HouseAndCompany(); 
+	    h.loadComponents("PowerComponents.txt");
+	    
+	    Random random = new Random();
+	    int randomIndex;
+	    
+	    if (random.nextDouble() > 0.4) { // Add house
+	        randomIndex = 5 + random.nextInt(3); // Random number between 5 and 7
+	    } else { // Add company
+	        randomIndex = 15 + random.nextInt(3); // Random number between 15 and 17
+	    }
+	    
+	    h.addRandomComponents(randomIndex);
+	    h.clculConsumePower();
+	    
+	    return h;
+	}
 
-        }else {// add company
-        	
-        	Random random = new Random();
-            randomIndex = 15 + random.nextInt(3);
-        }
-        
-        h.addRandomComponents(randomIndex);
-        h.clculConsumePower();
-        h.loadComponents("PowerComponents.txt");
-        return h;
-    }
 	
 
 	/*public static void main(String[] args) {

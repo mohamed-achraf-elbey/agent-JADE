@@ -1,4 +1,4 @@
-package pk;
+/*package pk;
 
 import jade.core.Agent;
 import jade.lang.acl.ACLMessage;
@@ -194,4 +194,4 @@ public class Agenttt extends Agent {
         }
         return totalPower;
     }
-}
+}*/
