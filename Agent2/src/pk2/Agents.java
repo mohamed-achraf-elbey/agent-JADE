@@ -1,93 +1,136 @@
 package pk2;
 
-import java.util.Random;
-
+import jade.core.AID;
 import jade.core.Agent;
 import jade.core.behaviours.CyclicBehaviour;
-import jade.core.behaviours.OneShotBehaviour;
 import jade.lang.acl.ACLMessage;
+import jade.lang.acl.MessageTemplate;
 
-public class Agents extends Agent{
-	 private Double capacity = 0.0;
-	 private boolean status;
-	 
-	 @Override
-	    protected void setup() {
-	        System.out.println("Agent " + getLocalName() + " is starting ");
-	        initializeAgent();
-	        
-	    }
-	 
-	 private void initializeAgent() {
-	        addBehaviour(new OneShotBehaviour() {
-	            public void action() {
-	                if (getLocalName().equals("p")) {
-	                    status = true;
-	                    capacity = setRandomCapacity(80000, 90000);
-	                    System.out.println("Principal agent " + getLocalName() + " initial capacity: " + String.format("%.2f", capacity) + " W");
-	                    sendMsgCapa();
-	                } else {
-	                    status = true;
-	                    receiveCapacity();	 
-	                    }
-	            }
-	        });
-	    }
-	 
-	 private double setRandomCapacity(int minCap, int maxCap) {
-	        Random random = new Random();
-	        return minCap + (maxCap - minCap) * random.nextDouble();
-	    }
-	 
-	 private void sendMsgCapa() {
-		    if (getLocalName().equals("p")) {
-		        double capacityL1 = setRandomCapacity(20000, 30000);
-		        double capacityL2 = setRandomCapacity(20000, 30000);
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
 
-		        if (capacity < capacityL1 + capacityL2) {
-		            status = false; // Principal agent goes offline if not enough capacity
-		            System.out.println("Principal agent " + getLocalName() + " is offline due to insufficient capacity.");
-		        } else {
-		            sendCapacity("l1", capacityL1);
-		            sendCapacity("l2", capacityL2);
-		            System.out.println("P agent sent capacity requests to local agents.");
-		        }
-		    }
-		}
+public class Agents extends Agent {
+    private double totalCapacity;
+    private double availableCapacity;
+    private boolean isPrincipal;
+    private Map<String, Double> allocatedPower;
 
-		private void sendCapacity(String localAgentName, double requestedCapacity) {
-		    ACLMessage msg = new ACLMessage(ACLMessage.REQUEST);
-		    msg.addReceiver(getAID(localAgentName));
-		    if (capacity >= requestedCapacity) {
-		        capacity -= requestedCapacity;
-		        msg.setContent("" + requestedCapacity);
-		    } else {
-		        msg.setContent("reject");
-		    }
-		    send(msg);
-		}
-		
-		private void receiveCapacity() {
-	        addBehaviour(new CyclicBehaviour() {
-	            public void action() {
-	                ACLMessage msg = receive();
-	                if (msg != null) {
-	                    String content = msg.getContent();
-	                    if ("reject".equals(content)) {
-	                        status = false;
-	                        System.out.println(getLocalName() + " received: Insufficient capacity from principal.");
-	                    } else {
-	                        capacity = Double.parseDouble(content);
-	                        status = true;
-	                        System.out.println(getLocalName() + " received updated capacity: " + String.format("%.2f", capacity) + " W.");
-	                    }
-	                } else {
-	                    block();
-	                }
-	            }
-	        });
-	    }
+    protected void setup() {
+        allocatedPower = new HashMap<>();
+        Random random = new Random();
 
-	 
-	 
+        if (getLocalName().equals("p")) {
+            isPrincipal = true;
+            totalCapacity = 10000 + random.nextDouble() * 20000;
+            availableCapacity = totalCapacity;
+            System.out.println("Principal agent " + getLocalName() + " initial capacity: " +
+                    String.format("%.2f", totalCapacity) + " W");
+        } else {
+            isPrincipal = false;
+            totalCapacity = 1000 + random.nextDouble() * 3000;
+            availableCapacity = 0;
+            System.out.println("Agent " + getLocalName() + " is starting");
+            requestPowerFromPrincipal();
+        }
+
+        addBehaviour(new CyclicBehaviour() {
+            public void action() {
+                MessageTemplate mt = MessageTemplate.or(
+                        MessageTemplate.MatchPerformative(ACLMessage.REQUEST),
+                        MessageTemplate.or(
+                                MessageTemplate.MatchPerformative(ACLMessage.INFORM),
+                                MessageTemplate.MatchPerformative(ACLMessage.REFUSE)
+                        )
+                );
+
+                ACLMessage msg = receive(mt);
+                if (msg != null) {
+                    try {
+                        String content = msg.getContent();
+                        if (msg.getPerformative() == ACLMessage.INFORM) {
+                            if (content.startsWith("POWER_ALLOCATED:")) {
+                                double receivedPower = Double.parseDouble(content.split(":")[1].replace(",", "."));
+                                if (!isPrincipal) {
+                                    availableCapacity = receivedPower;
+                                    totalCapacity = receivedPower;
+                                }
+                            }
+                        } else if (msg.getPerformative() == ACLMessage.REQUEST) {
+                            if (content.startsWith("POWER_REQUEST:") || content.startsWith("ADDITIONAL_POWER:")) {
+                                double requestedPower = Double.parseDouble(content.split(":")[1].replace(",", "."));
+                                handlePowerRequest(msg.getSender(), requestedPower);
+                            }
+                        } else if (msg.getPerformative() == ACLMessage.REFUSE) {
+                            System.out.println(getLocalName() + " received refusal for power request.");
+                            if (!isPrincipal) {
+                                requestPowerFromOtherAgent();
+                            }
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Error in " + getLocalName() + ": " + e.getMessage());
+                        System.err.println("Message content: " + msg.getContent());
+                    }
+                } else {
+                    block();
+                }
+            }
+        });
+    }
+
+    private void requestPowerFromPrincipal() {
+        ACLMessage msg = new ACLMessage(ACLMessage.REQUEST);
+        msg.addReceiver(new AID("p", AID.ISLOCALNAME));
+        msg.setContent("POWER_REQUEST:" + String.format("%.2f", totalCapacity).replace(",", "."));
+        send(msg);
+        System.out.println(getLocalName() + " is requesting capacity: " +
+                String.format("%.2f", totalCapacity) + " W from p");
+    }
+
+    private void requestPowerFromOtherAgent() {
+        ACLMessage msg = new ACLMessage(ACLMessage.REQUEST);
+        String targetAgent = getLocalName().equals("l1") ? "l2" : "l1";
+        msg.addReceiver(new AID(targetAgent, AID.ISLOCALNAME));
+        msg.setContent("POWER_REQUEST:" + String.format("%.2f", totalCapacity).replace(",", "."));
+        send(msg);
+        System.out.println(getLocalName() + " is requesting capacity from "+targetAgent);
+    }
+
+    private void handlePowerRequest(AID sender, double requestedPower) {
+        String agentName = sender.getLocalName();
+
+        // إذا كان هناك طاقة مخصصة سابقاً، قم بإعادتها إلى الطاقة المتاحة
+        if (allocatedPower.containsKey(agentName)) {
+            availableCapacity += allocatedPower.get(agentName);
+            allocatedPower.remove(agentName);
+        }
+
+        if (availableCapacity >= requestedPower) {
+            availableCapacity -= requestedPower;
+            allocatedPower.put(agentName, requestedPower);
+
+            ACLMessage reply = new ACLMessage(ACLMessage.INFORM);
+            reply.addReceiver(sender);
+            reply.setContent("POWER_ALLOCATED:" + String.format("%.2f", requestedPower).replace(",", "."));
+            send(reply);
+
+            if (isPrincipal) {
+                System.out.println("Principal allocated " + String.format("%.2f", requestedPower) +
+                        " W to " + agentName + ". Remaining capacity: " +
+                        String.format("%.2f", availableCapacity) + " W.");
+            } else {
+                System.out.println(getLocalName() + " allocated " + String.format("%.2f", requestedPower) +
+                        " W to " + agentName + ". Remaining capacity: " +
+                        String.format("%.2f", availableCapacity) + " W.");
+            }
+        } else {
+            ACLMessage reply = new ACLMessage(ACLMessage.REFUSE);
+            reply.addReceiver(sender);
+            reply.setContent("POWER_DENIED:Insufficient capacity");
+            send(reply);
+
+            System.out.println(getLocalName() + " refused to allocate " + String.format("%.2f", requestedPower) +
+                    " W to " + agentName + " (insufficient capacity)");
+        }
+    }
 }
