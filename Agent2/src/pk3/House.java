@@ -1,4 +1,4 @@
-package pk2;
+package pk3;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -81,7 +81,7 @@ public class House extends Agent {
                             System.out.println(getLocalName() + " received " + String.format("%.2f", receivedCapacity) + " W. New capacity: " + String.format("%.2f", capacity) + " W.");
 
                             if (reponse) {
-                            	status = false;
+                            	status = true;
                                 displayPowerStatus(currentTime);
                                 reponse = false ;
                                  

@@ -1,0 +1,729 @@
+package pk2;
+
+import java.util.Random;
+
+import jade.core.Agent;
+import jade.core.behaviours.CyclicBehaviour;
+import jade.core.behaviours.OneShotBehaviour;
+import jade.lang.acl.ACLMessage;
+
+public class Agents extends Agent {
+	public int time = 0 ;
+    private Double capacity = 0.0;
+    private boolean status = false;
+
+    @Override
+    protected void setup() {
+    	this.setEnabledO2ACommunication(true, 1); 
+        System.out.println("Agent " + getLocalName() + " is starting");
+        initializeAgent();
+    }
+
+    private void initializeAgent() {
+                if (getLocalName().equals("p")) {
+                   // status = true;
+                    capacity = setRandomCapacity(80000, 90000);
+                    System.out.println("Principal agent " + getLocalName() + " initial capacity: " + String.format("%.2f", capacity) + " W");
+                    receiveRequests();
+                } else if (getLocalName().equals("l1") || getLocalName().equals("l2")) {
+                    //status = true;
+                    sendCapacityRequest("p");
+                    receiveResponse();
+                    receiveRequests();
+                }
+            }
+    
+
+    private double setRandomCapacity(int minCap, int maxCap) {
+        Random random = new Random();
+        return minCap + (maxCap - minCap) * random.nextDouble();
+    }
+
+    private void sendCapacityRequest(String principalAgentName) {
+        addBehaviour(new OneShotBehaviour() {
+            public void action() {
+                ACLMessage msg = new ACLMessage(ACLMessage.REQUEST);
+                msg.addReceiver(getAID(principalAgentName));
+                double requestedCapacity = setRandomCapacity(20000, 30000);
+                msg.setContent("" + requestedCapacity);
+                System.out.println(getLocalName() + " is requesting capacity: " + String.format("%.2f", requestedCapacity) + " W from " + principalAgentName);
+                send(msg);
+            }
+        });
+    }
+
+    private void receiveResponse() {
+        addBehaviour(new CyclicBehaviour() {
+            public void action() {
+                ACLMessage msg = receive();
+                if (msg != null) {
+                    String content = msg.getContent();
+                    if ("reject".equals(content)) {
+                        status = false;
+                        System.out.println(getLocalName() + " received: Insufficient capacity from principal.");
+                    } else {
+                        capacity = Double.parseDouble(content);
+                        status = true;
+                        System.out.println(getLocalName() + " received allocated capacity: " + String.format("%.2f", capacity) + " W.");
+                    }
+                } else {
+                    block();
+                }
+            }
+        });
+    }
+
+    private void receiveRequests() {
+        addBehaviour(new CyclicBehaviour() {
+            public void action() {
+                ACLMessage msg = receive();
+                if (msg != null && msg.getPerformative() == ACLMessage.REQUEST) {
+                    String sender = msg.getSender().getLocalName();
+                    String content = msg.getContent();
+
+                    try {
+                        double requestedCapacity = Double.parseDouble(content);
+                        ACLMessage reply = msg.createReply();
+
+                        if (capacity >= requestedCapacity) {
+                            capacity -= requestedCapacity; // تخصيص الطاقة المطلوبة
+                            reply.setContent(String.valueOf(requestedCapacity));
+                            System.out.println(getLocalName() + " allocated " + String.format("%.2f", requestedCapacity) + 
+                                " W to " + sender + ". Remaining capacity: " + String.format("%.2f", capacity) + " W");
+                        } else {
+                            reply.setContent("reject");
+                            System.out.println(getLocalName() + " rejected request from " + sender + 
+                                " (requested: " + String.format("%.2f", requestedCapacity) + 
+                                " W, available: " + String.format("%.2f", capacity) + " W)");
+                        }
+
+                        send(reply);
+                    } catch (Exception e) {
+                        System.out.println(getLocalName() + " Error processing request from " + sender + ": " + e.getMessage());
+                        ACLMessage reply = msg.createReply();
+                        reply.setContent("reject");
+                        send(reply);
+                    }
+                }
+                block();
+            }
+        });
+    }
+    
+    public void displayStatus() {
+        System.out.println(getLocalName() + " remaining capacity: " + capacity + " W");
+    }
+
+
+
+}
+
+
+package pk2;
+
+import java.time.LocalTime;
+import jade.core.Profile;
+import jade.core.ProfileImpl;
+import jade.core.Runtime;
+import jade.wrapper.AgentController;
+import jade.wrapper.ContainerController;
+
+public class Main {
+    public static void main(String[] args) {
+        Runtime rt = Runtime.instance();
+        Profile p = new ProfileImpl();
+        p.setParameter(Profile.MAIN_HOST, "localhost");
+        p.setParameter(Profile.MAIN_PORT, "1300");
+        p.setParameter(Profile.GUI, "true");
+
+        ContainerController cc = rt.createMainContainer(p);
+
+        try {
+            // إنشاء الوكلاء
+            AgentController agentP = cc.createNewAgent("p", "pk2.Agents", null);
+            AgentController agentL1 = cc.createNewAgent("l1", "pk2.Agents", null);
+            AgentController agentL2 = cc.createNewAgent("l2", "pk2.Agents", null);
+            AgentController house1 = cc.createNewAgent("h1", "pk2.House", null);
+            AgentController house2 = cc.createNewAgent("h2", "pk2.House", null);
+            AgentController company1 = cc.createNewAgent("c1", "pk2.Company", null);
+            AgentController company2 = cc.createNewAgent("c2", "pk2.Company", null);
+
+            // تشغيل الوكلاء
+            agentP.start();
+            agentL1.start();
+            agentL2.start();
+            house1.start();
+            house2.start();
+            company1.start();
+            company2.start();
+
+            // الانتظار للتأكد من بدء جميع الوكلاء
+            Thread.sleep(10000);
+
+            // بدء المحاكاة
+            LocalTime currentTime = LocalTime.of(0, 0); // بدء من منتصف الليل
+            while (!currentTime.equals(LocalTime.of(23, 59))) {
+                System.out.println("\n=== Current time: " + currentTime + " ===");
+
+                // تحديث حالة المنازل
+                if (house1 != null && house1.getO2AInterface(House.class) != null) {
+                    house1.getO2AInterface(House.class).updateAgentStatus(currentTime);
+                } else {
+                	 
+                    System.err.println("Agent h1 is not initialized or O2AInterface is null.");
+                    break ;
+                }
+
+                if (house2 != null && house2.getO2AInterface(House.class) != null) {
+                    house2.getO2AInterface(House.class).updateAgentStatus(currentTime);
+                } else {
+                    System.err.println("Agent h2 is not initialized or O2AInterface is null.");
+                }
+
+                // تحديث حالة الشركات
+                if (company1 != null && company1.getO2AInterface(Company.class) != null) {
+                    company1.getO2AInterface(Company.class).updateAgentStatus(currentTime);
+                } else {
+                    System.err.println("Agent c1 is not initialized or O2AInterface is null.");
+                }
+
+                if (company2 != null && company2.getO2AInterface(Company.class) != null) {
+                    company2.getO2AInterface(Company.class).updateAgentStatus(currentTime);
+                } else {
+                    System.err.println("Agent c2 is not initialized or O2AInterface is null.");
+                }
+
+                // التقدم بالزمن
+                currentTime = currentTime.plusHours(1);
+
+                // الانتظار لثانية لمحاكاة ساعة
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    System.err.println("Sleep interrupted: " + e.getMessage());
+                }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+
+package pk2;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.time.LocalTime;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
+
+import jade.core.Agent;
+import jade.core.behaviours.CyclicBehaviour;
+import jade.core.behaviours.OneShotBehaviour;
+import jade.lang.acl.ACLMessage;
+
+public class House extends Agent {
+	private Double capacity = 0.0;
+	public boolean status = false ;
+	public double consumePower = 0.0 ;
+	public HashMap<String, Double> components = new HashMap<>();
+    public HashMap<String, Boolean> componentStates = new HashMap<>();
+    public HashMap<String, Double> componentsHouse = new HashMap<>();
+    
+    @Override
+    protected void setup() {
+    	try {
+			Thread.sleep(10);
+	    	this.setEnabledO2ACommunication(true, 1); // تفعيل واجهة O2A
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    	
+        loadComponents("PowerComponents.txt");
+        Random random = new Random();
+        int randomIndex = 5 + random.nextInt(3); 
+        addRandomComponents(randomIndex);
+        calculateConsumePower();
+        System.out.println("Agent " + getLocalName() + " is starting");
+        sendCapacityRequest();
+        receiveResponse();
+
+
+    }
+    
+    private void sendCapacityRequest() {
+        String AgentId = getLocalName().equals("h1") ? "l1" : "l2";
+        addBehaviour(new OneShotBehaviour() {
+            public void action() {
+                ACLMessage msg = new ACLMessage(ACLMessage.REQUEST);
+                msg.addReceiver(getAID(AgentId));
+
+                double requestedCapacity = getConsumePower();
+                msg.setContent("" + requestedCapacity);
+
+                System.out.println(getLocalName() + " is requesting capacity: " + String.format("%.2f", requestedCapacity) + " W from " + AgentId);
+                send(msg);
+
+                // تأكيد أن الرسالة تم إرسالها
+                System.out.println(getLocalName() + " sent message to " + AgentId + " with content: " + msg.getContent());
+            }
+        });
+    }
+
+    private void receiveResponse() {
+        addBehaviour(new CyclicBehaviour() {
+            public void action() {
+                ACLMessage msg = receive();
+                if (msg != null) {
+                    String content = msg.getContent();
+                    System.out.println(getLocalName() + " received message content: " + content);
+                    if ("reject".equals(content)) {
+                        status = false;
+                        System.out.println(getLocalName() + " received: Insufficient capacity from local.");
+                    } else {
+                        try {
+                            setCapacity(Double.parseDouble(content));
+                            System.out.println(getLocalName() + " capacity = " + capacity + ", consumePower = " + consumePower);
+                            System.out.println(getLocalName() + " updated capacity: " + capacity);
+                            status = true;
+                        } catch (NumberFormatException e) {
+                            System.err.println("Error parsing capacity: " + content);
+                        }
+                    }
+                } else {
+                    block();
+                }
+            }
+        });
+    }
+
+
+    
+	
+	 public void loadComponents(String filename) {
+	        try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
+	            String line;
+	            while ((line = br.readLine()) != null) {
+	                String[] parts = line.split(": ");
+	                if (parts.length == 2) {
+	                    String component = parts[0].trim();
+	                    Double power = Double.parseDouble(parts[1].trim());
+	                    components.put(component, power);
+	                }
+	            }
+	        } catch (IOException e) {
+	            e.printStackTrace();
+	        }
+	    }
+	 
+	 public void displayComponents() {
+	        System.out.println("Displaying componentsHouse (ON only):");
+	        for (Map.Entry<String, Double> entry : componentsHouse.entrySet()) {
+	            String component = entry.getKey();
+	            if (componentStates.getOrDefault(component, false)) { // Only display ON components
+	                Double power = entry.getValue();
+	                System.out.println(component + ": " + power + " W");
+	            }
+	        }
+	    }
+	 
+	 public void addRandomComponents(int numbeCom) {
+	        Random random = new Random();
+	        for (int i = 0; i < numbeCom; i++) {
+	            int randomIndex = random.nextInt(components.size());
+	            String randomKey = (String) components.keySet().toArray()[randomIndex];
+	            componentsHouse.put(randomKey, components.get(randomKey));
+	            componentStates.put(randomKey, true);
+	            components.remove(randomKey);
+	        }
+	    }
+	 
+	 public void calculateConsumePower() {
+	        consumePower = 0;
+	        for (Map.Entry<String, Double> entry : componentsHouse.entrySet()) {
+	            if (componentStates.getOrDefault(entry.getKey(), false)) { 
+	                consumePower += entry.getValue();
+	            }
+	        }
+	    }
+	 
+	 public void updateCompanyStatus() {
+	        LocalTime currentTime = LocalTime.now();
+	        if (currentTime.isAfter(LocalTime.of(8, 0)) && currentTime.isBefore(LocalTime.of(16, 0))) {
+	            status = true; // Company is online
+	            updateComponentStatesByTime();
+	        } else {
+	            status = false; // Company is offline
+	            for (String component : componentsHouse.keySet()) {
+	                componentStates.put(component, false); // Turn all components OFF
+	            }
+	        }
+	    }
+	 
+	 public void updateComponentStatesByTime() {
+	        if (!status) return; // Do nothing if company is offline
+
+	        LocalTime currentTime = LocalTime.now();
+	        if (currentTime.isAfter(LocalTime.of(8, 0)) && currentTime.isBefore(LocalTime.of(12, 0))) {
+	            Random random = new Random();
+	            for (String component : componentsHouse.keySet()) {
+	                if (random.nextBoolean()) { // Randomly turn some components OFF
+	                    componentStates.put(component, false);
+	                }
+	            }
+	        } else {
+	            for (String component : componentsHouse.keySet()) {
+	                componentStates.put(component, true); // Turn all components ON outside 8-12
+	            }
+	        }
+	    }
+	 
+	 public double getConsumePower() {
+			return consumePower;
+		}
+
+		private String getStatus() {
+			if(status)
+			return "online";
+			else return "offline" ;
+		}
+		private void setStatus(boolean status) {
+			this.status = status;
+		}
+
+		private void setConsumePower(double consumePower) {
+			this.consumePower = consumePower;
+		}
+
+		public Double getCapacity() {
+			return capacity;
+		}
+
+		public HashMap<String, Double> getComponents() {
+			return components;
+		}
+
+		public HashMap<String, Boolean> getComponentStates() {
+			return componentStates;
+		}
+
+		public HashMap<String, Double> getComponentsHouse() {
+			return componentsHouse;
+		}
+		public void setCapacity(Double c) {
+			capacity = c;
+		}
+		
+		public void updateAgentStatus(LocalTime currentTime) {
+		    if (getLocalName().startsWith("c")) { // إذا كان وكيل شركة
+		        if (currentTime.isAfter(LocalTime.of(8, 0)) && currentTime.isBefore(LocalTime.of(16, 0))) {
+		            status = true; // الشركة تعمل
+		            if (currentTime.isBefore(LocalTime.of(12, 0))) {
+		                randomizeComponentUsage(); // تشغيل عشوائي للمكونات
+		            } else {
+		                useAllComponents(); // تشغيل جميع المكونات
+		            }
+		        } else {
+		            status = false; // الشركة مغلقة
+		            for (String component : componentsHouse.keySet()) {
+		                componentStates.put(component, false); // إيقاف جميع المكونات
+		            }
+		            calculateConsumePower(); // تحديث استهلاك الطاقة
+		        }
+		    } else if (getLocalName().startsWith("h")) { // إذا كان وكيل منزل
+		        if ((currentTime.isAfter(LocalTime.of(6, 0)) && currentTime.isBefore(LocalTime.of(9, 0))) ||
+		            (currentTime.isAfter(LocalTime.of(17, 0)) && currentTime.isBefore(LocalTime.of(22, 0)))) {
+		            status = true; // المنزل في فترة الذروة
+		            randomizeComponentUsage();
+		        } else {
+		            status = false; // المنزل خارج فترة الذروة
+		            for (String component : componentsHouse.keySet()) {
+		                componentStates.put(component, false); // إيقاف جميع المكونات
+		            }
+		            calculateConsumePower(); // تحديث استهلاك الطاقة
+		        }
+		    }
+		}
+
+		
+		public void randomizeComponentUsage() {
+		    Random random = new Random();
+		    for (String component : componentsHouse.keySet()) {
+		        // تعيين حالة تشغيل عشوائية لكل مكون
+		        componentStates.put(component, random.nextBoolean());
+		    }
+		    calculateConsumePower(); // تحديث استهلاك الطاقة بعد التغيير
+		}
+
+		public void useAllComponents() {
+		    for (String component : componentsHouse.keySet()) {
+		        // تعيين حالة تشغيل لكل المكونات إلى ON
+		        componentStates.put(component, true);
+		    }
+		    calculateConsumePower(); // تحديث استهلاك الطاقة
+		}
+
+
+		
+		
+	/*	public static House initializeHouse() {
+			House h = new House();
+	        h.loadComponents("PowerComponents.txt");
+	        Random random = new Random();
+	        int randomIndex = 5 + random.nextInt(3); 
+	        h.addRandomComponents(randomIndex);
+	        h.calculateConsumePower();
+	        return h;
+	    }*/
+}
+
+
+package pk2;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.time.LocalTime;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
+
+import jade.core.Agent;
+import jade.core.behaviours.CyclicBehaviour;
+import jade.core.behaviours.OneShotBehaviour;
+import jade.lang.acl.ACLMessage;
+
+public class Company extends Agent {
+    public Double capacity = 0.0;
+    public boolean status = false;
+    public double consumePower = 0.0;
+    public HashMap<String, Double> components = new HashMap<>();
+    public HashMap<String, Boolean> componentStates = new HashMap<>();
+    public HashMap<String, Double> componentsCompany = new HashMap<>();
+    
+    @Override
+    protected void setup() {
+        try {
+        	this.setEnabledO2ACommunication(true, 1); // تفعيل واجهة O2A
+
+            Thread.sleep(10);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        System.out.println("Agent " + getLocalName() + " is starting");
+
+        loadComponents("PowerComponents.txt");
+        Random random = new Random();
+        int randomIndex = 5 + random.nextInt(3); 
+        addRandomComponents(randomIndex);
+        setConsumePower(calculateConsumePower());
+
+        sendCapacityRequest();
+        receiveResponse();
+    }
+
+    private void sendCapacityRequest() {
+        String AgentId = getLocalName().equals("c1") ? "l1" : "l2";
+        addBehaviour(new OneShotBehaviour() {
+            public void action() {
+                ACLMessage msg = new ACLMessage(ACLMessage.REQUEST);
+                msg.addReceiver(getAID(AgentId));
+                double requestedCapacity = getConsumePower();
+                msg.setContent("" + requestedCapacity);
+                System.out.println(getLocalName() + " is requesting capacity: " + String.format("%.2f", requestedCapacity) + " W from " + AgentId);
+                System.out.println(getLocalName() + " sent message to " + AgentId + " with content: " + msg.getContent());
+
+                send(msg);
+            }
+        });
+    }
+
+    private void receiveResponse() {
+        addBehaviour(new CyclicBehaviour() {
+            public void action() {
+                ACLMessage msg = receive();
+                if (msg != null) {
+                    String content = msg.getContent();
+                    if ("reject".equals(content)) {
+                        status = false;
+                        System.out.println(getLocalName() + " received: Insufficient capacity from local.");
+                    } else {
+                        capacity = Double.parseDouble(content);
+                        status = true;
+                        System.out.println(getLocalName() + " received allocated capacity: " + String.format("%.2f", capacity) + " W.");
+                        // إعادة حساب استهلاك الطاقة بناءً على السعة الجديدة
+                        setConsumePower(calculateConsumePower());
+                        System.out.println(getLocalName() + " capacity = " + capacity + ", consumePower = " + consumePower);
+                    }
+                } else {
+                    block();
+                }
+            }
+        });
+    }
+
+    public void loadComponents(String filename) {
+        try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                String[] parts = line.split(": ");
+                if (parts.length == 2) {
+                    String component = parts[0].trim();
+                    Double power = Double.parseDouble(parts[1].trim());
+                    components.put(component, power);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void displayComponents() {
+        if (!status) {
+            System.out.println("Company is offline. No components are active.");
+            return;
+        }
+        System.out.println("Displaying componentsCompany (ON only):");
+        for (Map.Entry<String, Double> entry : componentsCompany.entrySet()) {
+            String component = entry.getKey();
+            if (componentStates.getOrDefault(component, false)) { // Only display ON components
+                Double power = entry.getValue();
+                System.out.println(component + ": " + power + " W");
+            }
+        }
+    }
+
+    public void addRandomComponents(int numbeCom) {
+        Random random = new Random();
+        for (int i = 0; i < numbeCom; i++) {
+            int randomIndex = random.nextInt(components.size());
+            String randomKey = (String) components.keySet().toArray()[randomIndex];
+            componentsCompany.put(randomKey, components.get(randomKey));
+            componentStates.put(randomKey, true);
+            components.remove(randomKey);
+        }
+    }
+
+    public Double calculateConsumePower() {
+        consumePower = 0;
+        for (Map.Entry<String, Double> entry : componentsCompany.entrySet()) {
+            if (componentStates.getOrDefault(entry.getKey(), false)) { 
+                consumePower += entry.getValue();
+            }
+        }
+        return consumePower;
+    }
+
+    public void updateCompanyStatus() {
+        LocalTime currentTime = LocalTime.now();
+        if (currentTime.isAfter(LocalTime.of(8, 0)) && currentTime.isBefore(LocalTime.of(16, 0))) {
+            status = true; // Company is online
+            updateComponentStatesByTime();
+        } else {
+            status = false; // Company is offline
+            for (String component : componentsCompany.keySet()) {
+                componentStates.put(component, false); // Turn all components OFF
+            }
+        }
+    }
+
+    public void updateComponentStatesByTime() {
+        if (!status) return; // Do nothing if company is offline
+
+        LocalTime currentTime = LocalTime.now();
+        if (currentTime.isAfter(LocalTime.of(8, 0)) && currentTime.isBefore(LocalTime.of(12, 0))) {
+            Random random = new Random();
+            for (String component : componentsCompany.keySet()) {
+                if (random.nextBoolean()) { // Randomly turn some components OFF
+                    componentStates.put(component, false);
+                }
+            }
+        } else {
+            for (String component : componentsCompany.keySet()) {
+                componentStates.put(component, true); // Turn all components ON outside 8-12
+            }
+        }
+    }
+
+    public double getConsumePower() {
+        return consumePower;
+    }
+
+    private String getStatus() {
+        return status ? "online" : "offline";
+    }
+
+    private void setStatus(boolean status) {
+        this.status = status;
+    }
+
+    private void setConsumePower(double consumePower) {
+        this.consumePower = consumePower;
+    }
+    
+    public void updateAgentStatus(LocalTime currentTime) {
+	    if (getLocalName().startsWith("c")) { // إذا كان وكيل شركة
+	        if (currentTime.isAfter(LocalTime.of(8, 0)) && currentTime.isBefore(LocalTime.of(16, 0))) {
+	            status = true; // الشركة تعمل
+	            if (currentTime.isBefore(LocalTime.of(12, 0))) {
+	                randomizeComponentUsage(); // تشغيل عشوائي للمكونات
+	            } else {
+	                useAllComponents(); // تشغيل جميع المكونات
+	            }
+	        } else {
+	            status = false; // الشركة مغلقة
+	            for (String component : componentsCompany.keySet()) {
+	                componentStates.put(component, false); // إيقاف جميع المكونات
+	            }
+	            calculateConsumePower(); // تحديث استهلاك الطاقة
+	        }
+	    } else if (getLocalName().startsWith("h")) { // إذا كان وكيل منزل
+	        if ((currentTime.isAfter(LocalTime.of(6, 0)) && currentTime.isBefore(LocalTime.of(9, 0))) ||
+	            (currentTime.isAfter(LocalTime.of(17, 0)) && currentTime.isBefore(LocalTime.of(22, 0)))) {
+	            status = true; // المنزل في فترة الذروة
+	            randomizeComponentUsage();
+	        } else {
+	            status = false; // المنزل خارج فترة الذروة
+	            for (String component : componentsCompany.keySet()) {
+	                componentStates.put(component, false); // إيقاف جميع المكونات
+	            }
+	            calculateConsumePower(); // تحديث استهلاك الطاقة
+	        }
+	    }
+	}
+
+	
+	public void randomizeComponentUsage() {
+	    Random random = new Random();
+	    for (String component : componentsCompany.keySet()) {
+	        // تعيين حالة تشغيل عشوائية لكل مكون
+	        componentStates.put(component, random.nextBoolean());
+	    }
+	    calculateConsumePower(); // تحديث استهلاك الطاقة بعد التغيير
+	}
+
+	public void useAllComponents() {
+	    for (String component : componentsCompany.keySet()) {
+	        // تعيين حالة تشغيل لكل المكونات إلى ON
+	        componentStates.put(component, true);
+	    }
+	    calculateConsumePower(); // تحديث استهلاك الطاقة
+	}
+
+
+
+    /*public static Company initializeCompany() {
+        Company C = new Company();
+        C.loadComponents("PowerComponents.txt");
+        Random random = new Random();
+        int randomIndex = 5 + random.nextInt(3); 
+        C.addRandomComponents(randomIndex);
+        C.setConsumePower(C.calculateConsumePower());
+        return C;
+    }*/
+}

@@ -1,0 +1,14 @@
+Air Conditioner: 1500
+Heater: 2000
+Refrigerator: 150
+Washing Machine: 500
+Television: 100
+Computer: 300
+Microwave: 1200
+Oven: 2400
+Dishwasher: 1200
+Lighting: 60
+Water Heater: 4000
+Coffee Maker: 900
+Vacuum Cleaner: 1400
+Printer: 50

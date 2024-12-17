@@ -1,6 +1,7 @@
-package pk2;
+package pk3;
 
 import jade.core.Runtime;
+import jade.core.Agent;
 import jade.core.Profile;
 import jade.core.ProfileImpl;
 import jade.wrapper.AgentController;
@@ -14,31 +15,31 @@ public class Main {
         Profile p = new ProfileImpl();
         p.setParameter(Profile.MAIN_HOST, "localhost");
         p.setParameter(Profile.MAIN_PORT, "1099");
-        p.setParameter(Profile.GUI, "true");
+        p.setParameter(Profile.GUI, "false");
 
         ContainerController cc = rt.createMainContainer(p);
 
         try {
             System.out.println("\n=== Initializing Agents ===\n");
             
-            AgentController agentP = cc.createNewAgent("p", "pk2.Agents2", null);
+            AgentController agentP = cc.createNewAgent("p", "pk3.Agents2", null);
             agentP.start();
             Thread.sleep(1000);
 
-            AgentController agentL1 = cc.createNewAgent("l1", "pk2.Agents2", null);
-            AgentController agentL2 = cc.createNewAgent("l2", "pk2.Agents2", null);
+            AgentController agentL1 = cc.createNewAgent("l1", "pk3.Agents2", null);
+            AgentController agentL2 = cc.createNewAgent("l2", "pk3.Agents2", null);
             agentL1.start();
             agentL2.start();
             Thread.sleep(2000);
             
-            AgentController house1 = cc.createNewAgent("h1", "pk2.House", null);
-            AgentController house2 = cc.createNewAgent("h2", "pk2.House", null);
+            AgentController house1 = cc.createNewAgent("h1", "pk3.House", null);
+            AgentController house2 = cc.createNewAgent("h2", "pk3.House", null);
             house1.start();
             house2.start();
             Thread.sleep(2000);
 
-            AgentController company1 = cc.createNewAgent("c1", "pk2.Company", null);
-            AgentController company2 = cc.createNewAgent("c2", "pk2.Company", null);
+            AgentController company1 = cc.createNewAgent("c1", "pk3.Company", null);
+            AgentController company2 = cc.createNewAgent("c2", "pk3.Company", null);
             company1.start();
             company2.start();
 
@@ -104,16 +105,16 @@ public class Main {
         System.out.println("Total Power Distributed:");
         System.out.println("Total power distributed to Houses: " + House.getTotalConsumedPower() + " W");
         System.out.println("Total power distributed to Companies: " + Company.getTotalConsumedPower() + " W");
-        System.out.println("Total power distributed by Local Agents (l1, l2): " + (Agents.getTotalPowerDistributed()) + " W");
-        System.out.println("Total power distributed by Principal Agent (p): " + (Agents.getTotalPowerDistributed()) + " W");
+        System.out.println("Total power distributed by Local Agents (l1, l2): " + (Agents2.getTotalPowerDistributed()) + " W");
+        System.out.println("Total power distributed by Principal Agent (p): " + (Agents2.getTotalPowerDistributed()) + " W");
         
         System.out.println("Agent Activity Summary:");
         System.out.println("Total House Online Hours: " + House.getOnlineHours() + " hours");
         System.out.println("Total Company Online Hours: " + Company.getOnlineHours() + " hours");
-        System.out.println("Total Requests Handled by Local Agents (l1, l2): " + Agents.getTotalRequestsHandled());
-        System.out.println("Total Requests Handled by Principal Agent (p): " + Agents.getTotalRequestsHandled());
+        System.out.println("Total Requests Handled by Local Agents (l1, l2): " + Agents2.getTotalRequestsHandled());
+        System.out.println("Total Requests Handled by Principal Agent (p): " + Agents2.getTotalRequestsHandled());
         
-        double totalPower = House.getTotalConsumedPower() + Company.getTotalConsumedPower() + Agents.getTotalPowerDistributed();
+        double totalPower = House.getTotalConsumedPower() + Company.getTotalConsumedPower() + Agents2.getTotalPowerDistributed();
         double efficiency = (totalPower / (24 * 10000)) * 100; // Assuming 10000 W capacity per hour
         System.out.println("Overall System Efficiency: " + String.format("%.2f", efficiency) + "%");
     }

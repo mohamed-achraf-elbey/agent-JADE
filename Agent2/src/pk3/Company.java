@@ -1,4 +1,4 @@
-package pk2;
+package pk3;
 
 import jade.core.AID;
 import jade.core.Agent;
